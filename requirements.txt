@@ -1,0 +1,14 @@
+# Python 3.10+ (3.11 recommended)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.5
+python-multipart>=0.0.9      # file uploads (POST /ingest)
+openpyxl>=3.1                # bank_statement.xlsx + synthetic generator
+python-dateutil>=2.9         # timestamp fallback parsing
+
+# --- dev / test ---
+pytest>=8.0
+httpx>=0.27                  # FastAPI TestClient
+
+# --- stretch goals (uncomment only if you do them) ---
+# pdfplumber>=0.11           # PDF bank statements

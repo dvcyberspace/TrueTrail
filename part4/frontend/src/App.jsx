@@ -1,25 +1,56 @@
 import { useState, useEffect } from "react";
 import "./App.css";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Leaflet icon fix
+import L from "leaflet";
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
 
 function App() {
   const [auditLog, setAuditLog] = useState([]);
   const [chainStatus, setChainStatus] = useState(null);
   const [file, setFile] = useState(null);
-  const [caseId, setCaseId] = useState("CR-2026-001");
+  const [caseId, setCaseId] = useState("C123");
   const [uploadStatus, setUploadStatus] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
 
+  // Part 3 Data Load
+  const [timelineData, setTimelineData] = useState(null);
+
+  useEffect(() => {
+    // Load Part 3 JSON
+    import("./timeline.json").then((data) =>
+      setTimelineData(data.default || data),
+    );
+  }, []);
+
   const fetchAudit = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8001/audit");
+      const res = await fetch("http://localhost:8001/audit");
+      if (!res.ok) throw new Error("Backend error");
       const data = await res.json();
       setAuditLog(data);
 
-      const verifyRes = await fetch("http://127.0.0.1:8001/audit/verify");
+      const verifyRes = await fetch("http://localhost:8001/audit/verify");
       const verifyData = await verifyRes.json();
       setChainStatus(verifyData);
     } catch (err) {
-      console.error("Error fetching audit data", err);
+      console.error(err);
     }
   };
 
@@ -28,44 +59,32 @@ function App() {
   }, []);
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) return alert("Select a file!");
     const formData = new FormData();
     formData.append("file", file);
-
     try {
-      setUploadStatus("Uploading and Hashing...");
-      const res = await fetch("http://127.0.0.1:8001/evidence/upload", {
+      setUploadStatus("Hashing...");
+      const res = await fetch("http://localhost:8001/evidence/upload", {
         method: "POST",
         body: formData,
       });
       const data = await res.json();
-      setUploadStatus(`✅ Uploaded! Hash: ${data.sha256.substring(0, 15)}...`);
-      fetchAudit(); // Refresh table
+      setUploadStatus(`✅ Hash: ${data.sha256.substring(0, 15)}...`);
+      fetchAudit();
     } catch (err) {
-      setUploadStatus("❌ Upload failed.");
+      setUploadStatus("❌ Error connecting to backend.");
     }
   };
 
-  const handleGenerateReport = async () => {
-    if (auditLog.length === 0) return alert("No files in audit log!");
-    const lastFile = auditLog[auditLog.length - 1];
-
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:8001/report?file_name=${lastFile.file}&file_hash=${lastFile.file_hash}&case_id=${caseId}`,
-        {
-          method: "POST",
-        },
-      );
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `BSA_Report_${caseId}.pdf`;
-      a.click();
-    } catch (err) {
-      alert("Failed to generate PDF");
-    }
+  // Extract Polyline coordinates from GeoJSON
+  const getPathCoords = () => {
+    if (!timelineData || !timelineData.geo_tracks) return [];
+    const feature = timelineData.geo_tracks[0].geojson.features.find(
+      (f) => f.properties.kind === "path",
+    );
+    if (!feature) return [];
+    // Leaflet wants [lat, lon], GeoJSON is [lon, lat]
+    return feature.geometry.coordinates.map((coord) => [coord[1], coord[0]]);
   };
 
   return (
@@ -85,9 +104,7 @@ function App() {
         <p style={{ fontSize: "12px", color: "#94a3b8" }}>
           Evidence Integrity & Court Package
         </p>
-
         <hr style={{ borderColor: "#334155", margin: "20px 0" }} />
-
         <div
           style={{
             background: "#0f172a",
@@ -99,7 +116,7 @@ function App() {
           <input
             type="file"
             onChange={(e) => setFile(e.target.files[0])}
-            style={{ fontSize: "12px", marginBottom: "10px" }}
+            style={{ fontSize: "12px", marginBottom: "10px", color: "white" }}
           />
           <button
             onClick={handleUpload}
@@ -129,7 +146,7 @@ function App() {
       <div style={{ flex: 1, padding: "30px", background: "#f8fafc" }}>
         {/* TABS */}
         <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-          {["dashboard", "graph", "timeline"].map((tab) => (
+          {["dashboard", "timeline", "map"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -160,12 +177,11 @@ function App() {
                 marginBottom: "15px",
               }}
             >
-              <strong>Chain Integrity: </strong>
+              <strong>Chain Integrity: </strong>{" "}
               {chainStatus?.valid
                 ? `✅ SECURE (${chainStatus.entries} entries)`
                 : "❌ TAMPERED"}
             </div>
-
             <table
               style={{
                 width: "100%",
@@ -175,12 +191,6 @@ function App() {
             >
               <thead>
                 <tr style={{ background: "#e2e8f0", textAlign: "left" }}>
-                  <th style={{ padding: "10px", border: "1px solid #cbd5e1" }}>
-                    ID
-                  </th>
-                  <th style={{ padding: "10px", border: "1px solid #cbd5e1" }}>
-                    Time
-                  </th>
                   <th style={{ padding: "10px", border: "1px solid #cbd5e1" }}>
                     File
                   </th>
@@ -192,20 +202,6 @@ function App() {
               <tbody>
                 {auditLog.map((row) => (
                   <tr key={row.id}>
-                    <td
-                      style={{ padding: "10px", border: "1px solid #cbd5e1" }}
-                    >
-                      {row.id}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "12px",
-                      }}
-                    >
-                      {row.ts}
-                    </td>
                     <td
                       style={{ padding: "10px", border: "1px solid #cbd5e1" }}
                     >
@@ -228,89 +224,109 @@ function App() {
           </div>
         )}
 
-        {/* GRAPH TAB (MOCK) */}
-        {activeTab === "graph" && (
-          <div>
-            <h2>Mule Network Graph</h2>
-            <div
-              style={{
-                height: "400px",
-                background: "#e2e8f0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "10px",
-              }}
-            >
-              <p style={{ color: "#64748b" }}>
-                [Graph Visualization from Member 2 will render here]
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* TIMELINE TAB (MOCK) */}
-        {activeTab === "timeline" && (
-          <div>
-            <h2>Spatiotemporal Timeline</h2>
-            <div
-              style={{
-                height: "400px",
-                background: "#e2e8f0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "10px",
-              }}
-            >
-              <p style={{ color: "#64748b" }}>
-                [Timeline Map from Member 3 will render here]
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* BSA REPORT SECTION */}
-        <div
-          style={{
-            marginTop: "40px",
-            background: "white",
-            padding: "20px",
-            borderRadius: "10px",
-            border: "1px solid #cbd5e1",
-          }}
-        >
-          <h3>⚖️ BSA 2023 Section 63 Certificate</h3>
-          <p>
-            Generate court-admissible evidence certificate for the last uploaded
-            file.
-          </p>
-          <input
-            type="text"
-            value={caseId}
-            onChange={(e) => setCaseId(e.target.value)}
-            placeholder="Case ID"
+        {/* TIMELINE TAB (Part 3 Data) */}
+        {activeTab === "timeline" && timelineData && (
+          <div
             style={{
-              padding: "8px",
-              marginRight: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-            }}
-          />
-          <button
-            onClick={handleGenerateReport}
-            style={{
-              padding: "8px 15px",
-              background: "#10b981",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
+              background: "white",
+              padding: "20px",
+              borderRadius: "10px",
             }}
           >
-            Download BSA PDF
-          </button>
-        </div>
+            <h2>Event Sequence Reconstruction</h2>
+            <p style={{ color: "#64748b" }}>
+              Case: {timelineData.case_id} | Window:{" "}
+              {timelineData.parameters.windows_min[0]} min
+            </p>
+
+            <div
+              style={{
+                borderLeft: "2px solid #3b82f6",
+                paddingLeft: "20px",
+                marginTop: "20px",
+              }}
+            >
+              {timelineData.events.map((evt) => (
+                <div
+                  key={evt.event_id}
+                  style={{ marginBottom: "20px", position: "relative" }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "-26px",
+                      top: "5px",
+                      width: "12px",
+                      height: "12px",
+                      borderRadius: "50%",
+                      background: evt.type === "UPI" ? "#ef4444" : "#3b82f6",
+                    }}
+                  ></div>
+                  <strong>{new Date(evt.start_utc).toLocaleString()}</strong> -{" "}
+                  {evt.type}
+                  {evt.amount && (
+                    <span style={{ color: "#ef4444", marginLeft: "10px" }}>
+                      ₹{evt.amount}
+                    </span>
+                  )}
+                  <div style={{ fontSize: "14px", color: "#475569" }}>
+                    {evt.type === "UPI"
+                      ? `Paid to ${evt.entities.payee_id}`
+                      : `Device: ${evt.entities.imei || "N/A"}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* MAP TAB (Part 3 Data) */}
+        {activeTab === "map" && timelineData && (
+          <div
+            style={{
+              height: "600px",
+              borderRadius: "10px",
+              overflow: "hidden",
+            }}
+          >
+            <MapContainer
+              center={[28.753477, 77.057639]}
+              zoom={12}
+              style={{ height: "100%", width: "100%" }}
+            >
+              <TileLayer
+                url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              />
+
+              {/* Render Geo Track Path */}
+              <Polyline
+                pathOptions={{ color: "#38bdf8", weight: 4 }}
+                positions={getPathCoords()}
+              />
+
+              {/* Render Pings */}
+              {timelineData.geo_tracks[0].geojson.features
+                .filter((f) => f.properties.kind === "ping")
+                .map((ping, idx) => (
+                  <Marker
+                    key={idx}
+                    position={[
+                      ping.geometry.coordinates[1],
+                      ping.geometry.coordinates[0],
+                    ]}
+                  >
+                    <Popup>
+                      Ping at:{" "}
+                      {new Date(ping.properties.time_utc).toLocaleString()}{" "}
+                      <br />
+                      Radius: {ping.properties.radius_m}m
+                    </Popup>
+                  </Marker>
+                ))}
+            </MapContainer>
+          </div>
+        )}
       </div>
     </div>
   );

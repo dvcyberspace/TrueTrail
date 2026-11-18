@@ -7,10 +7,11 @@ export const ROLE = {
   victim:  { label: "Source of funds",     color: "#fbbf24" },
   mule:    { label: "Mule (pass-through)", color: "#f472b6" },
   cashout: { label: "Terminal account",    color: "#38bdf8" },
+  handler: { label: "Likely handler",      color: "#fb923c" },
   other:   { label: "Other account",       color: "#64748b" },
 };
 
-export function buildGraph(txns) {
+export function buildGraph(txns, calls = [], scores = {}) {
   const ok = txns.filter((t) => t.status === "SUCCESS");
 
   // 1) Identity: map UPI handles to account numbers so one person = one node
@@ -34,6 +35,8 @@ export function buildGraph(txns) {
         id, name: names.get(id) || fallback || id,
         inSum: 0, outSum: 0, inCnt: 0, outCnt: 0, cashIn: 0, cashOut: 0,
         firstOut: Infinity, devices: new Map(), ips: new Map(), role: "other",
+        phones: new Map(), inTimes: [],
+        risk: scores[id]?.risk ?? null, reasons: scores[id]?.reasons ?? [],
       });
     return nodes.get(id);
   };
@@ -45,6 +48,8 @@ export function buildGraph(txns) {
       const a = getNode(s, t.sender_name), b = getNode(r, t.receiver_name);
       a.outSum += t.amount; a.outCnt++; b.inSum += t.amount; b.inCnt++;
       a.firstOut = Math.min(a.firstOut, ts);
+      b.inTimes.push(ts);
+      if (t.sender_mobile) a.phones.set(t.sender_mobile, (a.phones.get(t.sender_mobile) || 0) + 1);
       if (t.device_id) a.devices.set(t.device_id, (a.devices.get(t.device_id) || 0) + 1);
       if (t.ip_address) a.ips.set(t.ip_address, (a.ips.get(t.ip_address) || 0) + 1);
       const k = s + ">" + r;
@@ -81,6 +86,30 @@ export function buildGraph(txns) {
     }
   }
 
+  // 4b) Handler: a phone that calls several flagged accounts shortly after each of them
+  //     receives money (and before they forward it). Uses the call records (CDR).
+  const WINDOW = 10 * 60 * 1000;
+  const flaggedPhones = new Set();
+  const phoneOf = (n) => [...n.phones.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const mules = suspicious.filter((n) => n.role === "mule" && phoneOf(n));
+  mules.forEach((m) => flaggedPhones.add(phoneOf(m)));
+  const hits = new Map(); // caller -> Map(muleId -> count)
+  for (const c of calls) {
+    if (flaggedPhones.has(c.caller)) continue;
+    const m = mules.find((x) => phoneOf(x) === c.callee);
+    if (!m) continue;
+    const ts = Date.parse(c.start_time);
+    if (!m.inTimes.some((t) => ts >= t && ts - t <= WINDOW)) continue;
+    if (!hits.has(c.caller)) hits.set(c.caller, new Map());
+    const mm = hits.get(c.caller);
+    mm.set(m.id, (mm.get(m.id) || 0) + 1);
+  }
+  let handler = null;
+  for (const [phone, mm] of hits) {
+    if (mm.size >= Math.max(3, Math.ceil(0.6 * mules.length)) && (!handler || mm.size > handler.mules.length))
+      handler = { phone, mules: [...mm.entries()].map(([id, count]) => ({ id, count })) };
+  }
+
   // 5) Summary
   const flowEdges = [...edges.values()].filter((e) => sus.has(e.source) && sus.has(e.target));
   const stats = {
@@ -91,7 +120,7 @@ export function buildGraph(txns) {
     from: flowEdges.length ? Math.min(...flowEdges.map((e) => e.first)) : null,
     to: flowEdges.length ? Math.max(...flowEdges.map((e) => e.last)) : null,
   };
-  return { nodes: [...nodes.values()], edges: [...edges.values()], shared, sus, stats };
+  return { nodes: [...nodes.values()], edges: [...edges.values()], shared, sus, stats, handler };
 }
 
 // Returns fresh copies (the graph library mutates what it receives).
@@ -118,5 +147,29 @@ export function viewGraph(g, mode) {
   const ns = ordered.map((n, i, arr) => ({ ...n, fx: (i - (arr.length - 1) / 2) * 120, fy: i % 2 ? 34 : -34 }));
   const links = [...g.edges.filter((e) => g.sus.has(e.source) && g.sus.has(e.target)), ...g.shared]
     .map((e) => ({ ...e, label: e.kind === "flow" ? label(e) : "" }));
+  if (g.handler) {
+    const hid = "handler:" + g.handler.phone;
+    ns.push({
+      id: hid, name: "Likely handler", phone: g.handler.phone, role: "handler", volume: 0, passthrough: 0,
+      inSum: 0, outSum: 0, inCnt: 0, outCnt: 0, cashIn: 0, cashOut: 0, called: g.handler.mules.length,
+      fx: 0, fy: -125, reasons: [],
+    });
+    for (const m of g.handler.mules)
+      links.push({ source: hid, target: m.id, kind: "call", label: m.count + (m.count > 1 ? " calls" : " call") });
+  }
   return { nodes: ns, links };
+}
+
+// ---- Engine graph: the correlation engine's own output (top 100 nodes by controller score) ----
+export const KIND_COLOR = {
+  account: "#f87171", phone: "#34d399", device: "#a78bfa", ip_address: "#fbbf24", vpa: "#38bdf8",
+};
+export function viewEngine(engine) {
+  return {
+    nodes: engine.nodes.map((n) => ({ ...n, role: "engine" })),
+    links: engine.edges.map((e) => ({
+      source: e.source, target: e.target,
+      kind: e.kind === "TRANSFERRED" ? "flow" : "link", total: e.amount || 0, label: "",
+    })),
+  };
 }

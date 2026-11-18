@@ -8,6 +8,9 @@ import GraphView from "./components/GraphView.jsx";
 import { TimelineView, MapView } from "./components/TimeMap.jsx";
 import timeline from "./timeline.json";
 import transactions from "./transactions.json";
+import calls from "./calls.json";
+import engineScores from "./engineScores.json";
+import engineGraph from "./engineGraph.json";
 
 const TABS = ["dashboard", "graph", "timeline", "map"];
 
@@ -64,7 +67,7 @@ export default function App() {
         </nav>
 
         {tab === "dashboard" && <Ledger refreshKey={refreshKey} />}
-        {tab === "graph" && <GraphView transactions={txns} />}
+        {tab === "graph" && <GraphView transactions={txns} calls={calls} scores={engineScores} engine={engineGraph} />}
         {tab === "timeline" && <TimelineView data={timeline} />}
         {tab === "map" && <MapView data={timeline} />}
       </div>

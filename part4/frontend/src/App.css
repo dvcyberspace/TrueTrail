@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
-body { background: #000; color: #fff; font-family: "Inter", system-ui, sans-serif; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+body { background: transparent; color: #fff; font-family: "Inter", system-ui, sans-serif; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
 h1, h2, h3, h4, p { margin: 0; }
 button, input { font-family: inherit; }
 .muted { color: #8b8b95; }
@@ -8,9 +8,9 @@ button, input { font-family: inherit; }
 .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 
 /* ---------- Ripple background ---------- */
-.ripple { position: fixed; inset: 0; z-index: -1; pointer-events: none; display: grid; overflow: hidden; --rc: #22d3ee; }
+.ripple { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: grid; overflow: hidden; --rc: #22d3ee; }
 .ripple .cell {
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   transition: background 1.2s ease, border-color 1.2s ease, box-shadow 1.2s ease;
 }
 .ripple .cell.hover {
@@ -22,14 +22,14 @@ button, input { font-family: inherit; }
 .ripple .cell.go { animation: cellrip var(--t) ease-out var(--d) 1; }
 @keyframes cellrip {
   35% {
-    background: color-mix(in srgb, var(--rc) 20%, transparent);
-    border-color: color-mix(in srgb, var(--rc) 50%, transparent);
+    background: color-mix(in srgb, var(--rc) 26%, transparent);
+    border-color: color-mix(in srgb, var(--rc) 60%, transparent);
     box-shadow: inset 0 0 12px color-mix(in srgb, var(--rc) 30%, transparent);
   }
 }
 
 /* ---------- Layout ---------- */
-.page { max-width: 1180px; margin: 0 auto; padding: 24px 24px 80px; position: relative; }
+.page { max-width: 1180px; margin: 0 auto; padding: 24px 24px 80px; position: relative; z-index: 1; }
 
 .hero-row { display: grid; grid-template-columns: 300px 1fr; gap: 40px; align-items: start; }
 .ingest-card {
@@ -131,6 +131,8 @@ button, input { font-family: inherit; }
 .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; color: #999; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
 .legend i.dash { width: 18px; height: 0; border-radius: 0; border-top: 2px dashed #a78bfa; }
+.legend i.dash.orange { border-top-color: #fb923c; }
+.reasons { margin: 10px 0 0; padding-left: 16px; font-size: 11px; color: #999; line-height: 1.5; }
 .evidence { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .evidence h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #aaa; margin-bottom: 8px; }
 .evidence p { font-size: 13px; color: #ccc; line-height: 1.6; }

@@ -1,0 +1,335 @@
+/* ===== 3D tilt card (upload & hash) ===== */
+@property --ang {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes spin-border {
+  to {
+    --ang: 360deg;
+  }
+}
+
+.tilt {
+  perspective: 900px;
+}
+.tilt-card.ingest-card {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: none; /* a blur would flatten the 3D */
+  background:
+    radial-gradient(
+        circle at bottom left,
+        rgba(255, 255, 255, 0.035) 35%,
+        transparent 36%
+      )
+      0 0 / 4.95em 4.95em padding-box,
+    radial-gradient(
+        circle at top right,
+        rgba(255, 255, 255, 0.035) 35%,
+        transparent 36%
+      )
+      0 0 / 4.95em 4.95em padding-box,
+    linear-gradient(#0a0a0c, #0a0a0c) padding-box,
+    conic-gradient(
+        from var(--ang),
+        rgba(34, 211, 238, 0.6),
+        rgba(244, 114, 182, 0.6),
+        rgba(167, 139, 250, 0.6),
+        rgba(251, 191, 36, 0.6),
+        rgba(34, 211, 238, 0.6)
+      )
+      border-box;
+  animation: spin-border 9s linear infinite;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition:
+    transform 0.18s ease-out,
+    box-shadow 0.35s ease;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.55),
+    0 0 26px rgba(34, 211, 238, 0.07),
+    0 0 52px rgba(244, 114, 182, 0.05);
+}
+.tilt:hover .tilt-card.ingest-card {
+  box-shadow:
+    0 22px 45px rgba(0, 0, 0, 0.65),
+    0 0 30px rgba(34, 211, 238, 0.16),
+    0 0 60px rgba(244, 114, 182, 0.12),
+    0 0 90px rgba(167, 139, 250, 0.08);
+}
+/* soft glare that follows the pointer */
+.tilt-card.ingest-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(
+    circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.1),
+    transparent 45%
+  );
+}
+.tilt:hover .tilt-card.ingest-card::after {
+  opacity: 1;
+}
+/* faint flower mark, like the card in the reference */
+.tilt-card.ingest-card::before {
+  content: "❁";
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  font-size: 46px;
+  opacity: 0.07;
+  pointer-events: none;
+}
+/* depth: content floats above the card */
+.tilt-card.ingest-card h2 {
+  transform: translateZ(34px);
+}
+.tilt-card.ingest-card .sub {
+  transform: translateZ(26px);
+}
+.tilt-card.ingest-card .ingest-box {
+  transform: translateZ(22px);
+}
+
+/* ===== Vertical timeline ===== */
+.tl-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 6px;
+}
+.chipbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #888;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.25s;
+}
+.chipbtn i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  opacity: 0.5;
+}
+.chipbtn span {
+  color: #666;
+}
+.chipbtn.on {
+  color: #fff;
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border-color: color-mix(in srgb, var(--c) 45%, transparent);
+}
+.chipbtn.on i {
+  opacity: 1;
+  box-shadow: 0 0 8px var(--c);
+}
+
+.tl2 {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+  position: relative;
+}
+.tl2::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    rgba(34, 211, 238, 0.4),
+    rgba(244, 114, 182, 0.4),
+    rgba(167, 139, 250, 0.4)
+  );
+}
+.tl2-day {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  margin: 22px 0 8px;
+}
+.tl2-day span {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #bbb;
+  background: #0c0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.tl2-item {
+  position: relative;
+  width: 50%;
+  padding: 10px 42px 10px 0;
+}
+.tl2-item.right {
+  margin-left: 50%;
+  padding: 10px 0 10px 42px;
+}
+
+/* the dot on the line fills in when the event scrolls into view */
+.tl2-item::after {
+  content: "";
+  position: absolute;
+  top: 24px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  z-index: 1;
+  background: #0a0a0a;
+  border: 2px solid var(--c);
+  transition:
+    background 0.5s,
+    box-shadow 0.5s,
+    transform 0.5s;
+}
+.tl2-item.right::after {
+  right: auto;
+  left: -8px;
+}
+.tl2-item.in-view::after {
+  background: var(--c);
+  transform: scale(1.1);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--c) 18%, transparent),
+    0 0 16px color-mix(in srgb, var(--c) 55%, transparent);
+}
+
+/* the card slides in from its side */
+.tl2-card {
+  position: relative;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(13, 13, 16, 0.82);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid color-mix(in srgb, var(--c) 55%, transparent);
+  visibility: hidden;
+  opacity: 0;
+  transform: translate3d(-70px, 0, 0);
+  transition:
+    transform 0.65s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.65s,
+    visibility 0.65s,
+    box-shadow 0.3s;
+}
+.tl2-item.right .tl2-card {
+  transform: translate3d(70px, 0, 0);
+}
+.tl2-item.in-view .tl2-card {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+}
+.tl2-card:hover {
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--c) 20%, transparent),
+    0 0 44px color-mix(in srgb, var(--c) 8%, transparent);
+}
+.tl2-card::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  width: 12px;
+  height: 12px;
+  background: #0d0d10;
+  transform: rotate(45deg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.tl2-item:not(.right) .tl2-card::before {
+  right: -7px;
+  border-left: 0;
+  border-bottom: 0;
+}
+.tl2-item.right .tl2-card::before {
+  left: -7px;
+  border-right: 0;
+  border-top: 0;
+}
+
+.tl2-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.tl2-badge {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.tl2-top time {
+  color: #777;
+}
+.tl2-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.tl2-meta {
+  font-size: 12px;
+  color: #8b8b95;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+@media (max-width: 700px) {
+  .tl2::before {
+    left: 14px;
+  }
+  .tl2-item,
+  .tl2-item.right {
+    width: 100%;
+    margin-left: 0;
+    padding: 10px 0 10px 44px;
+  }
+  .tl2-item::after,
+  .tl2-item.right::after {
+    left: 6px;
+    right: auto;
+  }
+  .tl2-item .tl2-card,
+  .tl2-item.right .tl2-card {
+    transform: translate3d(50px, 0, 0);
+  }
+  .tl2-item.in-view .tl2-card {
+    transform: none;
+  }
+  .tl2-item:not(.right) .tl2-card::before,
+  .tl2-item.right .tl2-card::before {
+    left: -7px;
+    right: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 0;
+    border-top: 0;
+  }
+  .tl2-day {
+    text-align: left;
+    padding-left: 30px;
+  }
+}

@@ -11,7 +11,9 @@ import transactions from "./transactions.json";
 import calls from "./calls.json";
 import engineScores from "./engineScores.json";
 import engineGraph from "./engineGraph.json";
-
+import BeeScroll from "./components/BeeScroll.jsx";
+import "./effects.css";
+import TiltCard from "./components/TiltCard.jsx";
 const TABS = ["dashboard", "graph", "timeline", "map"];
 
 export default function App() {
@@ -42,32 +44,50 @@ export default function App() {
       <RippleBackground />
       <div className="page">
         <div className="hero-row">
-          <div className="ingest-card">
+          <TiltCard className="ingest-card">
             <h2>TRUETRAIL</h2>
             <p className="sub">EVIDENCE ENGINE</p>
             <div className="ingest-box">
               <h4>INGEST EVIDENCE</h4>
               <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-              <button className="neon-btn" onClick={upload}>Upload & Hash</button>
+              <button className="neon-btn" onClick={upload}>
+                Upload & Hash
+              </button>
               {status && <p className="ingest-status">{status}</p>}
             </div>
-          </div>
+          </TiltCard>
           <div className="hero-text">
             <h1>Digital Evidence Correlation</h1>
             <p>Secure. Correlate. Reconstruct.</p>
           </div>
         </div>
 
-        <SkiperText />
+        <div className="stage">
+          <SkiperText />
+          <BeeScroll />
+        </div>
 
         <nav className="tabs" aria-label="Sections">
           {TABS.map((t) => (
-            <button key={t} className={"tab-btn" + (tab === t ? " active" : "")} onClick={() => setTab(t)}>{t}</button>
+            <button
+              key={t}
+              className={"tab-btn" + (tab === t ? " active" : "")}
+              onClick={() => setTab(t)}
+            >
+              {t}
+            </button>
           ))}
         </nav>
 
         {tab === "dashboard" && <Ledger refreshKey={refreshKey} />}
-        {tab === "graph" && <GraphView transactions={txns} calls={calls} scores={engineScores} engine={engineGraph} />}
+        {tab === "graph" && (
+          <GraphView
+            transactions={txns}
+            calls={calls}
+            scores={engineScores}
+            engine={engineGraph}
+          />
+        )}
         {tab === "timeline" && <TimelineView data={timeline} />}
         {tab === "map" && <MapView data={timeline} />}
       </div>
